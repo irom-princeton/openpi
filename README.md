@@ -123,10 +123,12 @@ We provide detailed step-by-step examples for running inference of our pre-train
 
 ## Fine-Tuning Base Models on Your Own Data
 
-We will fine-tune the $\pi_{0.5}$ model on the [LIBERO dataset](https://libero-project.github.io/datasets) as a running example for how to fine-tune a base model on your own data. We will explain three steps:
+We will fine-tune the $\pi_{0.5}$ model on collected Libero data as a running example for how to fine-tune a base model on your own data. We will explain three steps:
 1. Convert your data to a LeRobot dataset (which we use for training)
 2. Defining training configs and running training
 3. Spinning up a policy server and running inference
+
+These steps will also be explained on the example of a custom (smaller) DROID dataset *****not sure if this counts as a droid dataset, what do i refer to it as? 
 
 ### 1. Convert your data to a LeRobot dataset
 
@@ -137,6 +139,22 @@ uv run examples/libero/convert_libero_data_to_lerobot.py --data_dir /path/to/you
 ```
 
 **Note:** If you just want to fine-tune on LIBERO, you can skip this step, because our LIBERO fine-tuning configs point to a pre-converted LIBERO dataset. This step is merely an example that you can adapt to your own data.
+
+**Converting DROID data to a LeRobot dataset:**
+You must update `HF_LEROBOT_HOME` in [`setup.bash`](bash_scripts/setup.bash) so that it points towards your directory for processed data. There are now two methods to convert SVO2 data to LeRobot format
+1. Directly convert using [`examples/droid/convert_droid_svo2_to_lerobot.py`](examples/droid/convert_droid_svo2_to_lerobot.py).
+
+   Create a directory for the raw data and use `rsync -azvp` to push the video files to that directory. The `REPO_NAME` is automatically set to "irom_droid" which you can update to your desired name. Run the script with:
+
+```bash
+uv run examples/droid/convert_droid_svo2_to_lerobot.py --data_dir /path/to/your/droid/data
+```
+
+2. You can also convert your data to LeRobot format using [`examples/droid/convert_droid_data_to_lerobot.py`](examples/droid/convert_droid_data_to_lerobot.py). You must first convert your SVO2 files to mp4 format:
+
+```bash
+
+```
 
 ### 2. Defining training configs and running training
 
