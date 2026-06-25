@@ -122,60 +122,65 @@ We provide detailed step-by-step examples for running inference of our pre-train
 
 
 ## Fine-Tuning Base Models on Your Own Data
+For the original instructions for fine-tuning the $\pi_{0.5}$ model on collected Libero data, read the fine-tuning instructions [here](https://github.com/Physical-Intelligence/openpi/tree/main). 
 
-We will fine-tune the $\pi_{0.5}$ model on collected Libero data as a running example for how to fine-tune a base model on your own data. We will explain three steps:
+We will finetune the $\pi_{0}$ model and $\pi_{0.5}$ model on a custom (smaller) DROID dataset collected on Franka Emika Robot Arm. This will be explained in three steps:
 1. Convert your data to a LeRobot dataset (which we use for training)
 2. Defining training configs and running training
 3. Spinning up a policy server and running inference
 
-These steps will also be explained on the example of a custom (smaller) DROID dataset *****not sure if this counts as a droid dataset, what do i refer to it as? 
 
-### 1. Convert your data to a LeRobot dataset
+### 2. Convert your data to a LeRobot dataset
+**Set up:**
+Update `HF_LEROBOT_HOME` in [`bash_scripts/setup.bash`](bash_scripts/setup.bash). This is where your processed data will be saved. Run `source bash_scripts/setup.bash` to run the setup file. 
 
-We provide a minimal example script for converting LIBERO data to a LeRobot dataset in [`examples/libero/convert_libero_data_to_lerobot.py`](examples/libero/convert_libero_data_to_lerobot.py). You can easily modify it to convert your own data! You can download the raw LIBERO dataset from [here](https://huggingface.co/datasets/openvla/modified_libero_rlds), and run the script with:
+There are now two methods to convert SVO2 data to LeRobot format
+1. Directly convert from svo2 to LeRobot.
 
-```bash
-uv run examples/libero/convert_libero_data_to_lerobot.py --data_dir /path/to/your/libero/data
-```
-
-**Note:** If you just want to fine-tune on LIBERO, you can skip this step, because our LIBERO fine-tuning configs point to a pre-converted LIBERO dataset. This step is merely an example that you can adapt to your own data.
-
-**Converting DROID data to a LeRobot dataset:**
-You must update `HF_LEROBOT_HOME` in [`setup.bash`](bash_scripts/setup.bash) so that it points towards your directory for processed data. There are now two methods to convert SVO2 data to LeRobot format
-1. Directly convert using [`examples/droid/convert_droid_svo2_to_lerobot.py`](examples/droid/convert_droid_svo2_to_lerobot.py).
-
-   Create a directory for the raw data and use `rsync -azvp` to push the video files to that directory. The `REPO_NAME` is automatically set to "irom_droid" which you can update to your desired name. Run the script with:
+   Create a directory for the raw data and use `rsync -azvp` to push the raw data files from the desktop connected to to that directory. The `REPO_NAME` is automatically set to "irom_droid" which you can update to your desired name. Run the [`examples/droid/convert_droid_svo2_to_lerobot.py`](examples/droid/convert_droid_svo2_to_lerobot.py) script with:
 
 ```bash
 uv run examples/droid/convert_droid_svo2_to_lerobot.py --data_dir /path/to/your/droid/data
 ```
 
-2. You can also convert your data to LeRobot format using [`examples/droid/convert_droid_data_to_lerobot.py`](examples/droid/convert_droid_data_to_lerobot.py). You must first convert your SVO2 files to mp4 format:
+2. Convert your svo2 files to mp4 format and then to a LeRobot dataset.
+   This requires an extra step, but allows you to directly view your videos on the computer. Using the computer connected to the Franka robot arm, dun the following command to convert your SVO2 files to mp4 format:   
 
 ```bash
 
 ```
+   Use `rsync -azvp` to push the mp4 videos to your neuronic folder for raw data and run [`examples/droid/convert_droid_data_to_lerobot.py`](examples/droid/convert_droid_data_to_lerobot.py), 
+
 
 ### 2. Defining training configs and running training
+To fine-tune a base model on your own data, you need to define configs for data processing and training. We provide example configs with detailed comments for finetuning pi05-DROID and pi0-fast, which you can modify for your own dataset in [`TrainConfig`](src/openpi/training/config.py).
 
-To fine-tune a base model on your own data, you need to define configs for data processing and training. We provide example configs with detailed comments for LIBERO below, which you can modify for your own dataset:
+When you fine-tune one of our models on a new dataset, you need to decide whether to (A) reuse existing normalization statistics or (B) compute new statistics over your new training data. Which option is better for you depends on the similarity of your robot and task to the robot and task distribution in the pre-training dataset. In most cases, though, you will be using the original DROID norm stats during fine-tuning. 
 
-- [`LiberoInputs` and `LiberoOutputs`](src/openpi/policies/libero_policy.py): Defines the data mapping from the LIBERO environment to the model and vice versa. Will be used for both, training and inference.
-- [`LeRobotLiberoDataConfig`](src/openpi/training/config.py): Defines how to process raw LIBERO data from LeRobot dataset for training.
-- [`TrainConfig`](src/openpi/training/config.py): Defines fine-tuning hyperparameters, data config, and weight loader.
-
-We provide example fine-tuning configs for [π₀](src/openpi/training/config.py), [π₀-FAST](src/openpi/training/config.py), and [π₀.₅](src/openpi/training/config.py) on LIBERO data.
-
-Before we can run training, we need to compute the normalization statistics for the training data. Run the script below with the name of your training config:
+To compute your own normalization statistics for the training data, run the script below with the name of your training config:
 
 ```bash
-uv run scripts/compute_norm_stats.py --config-name pi05_libero
+uv run scripts/compute_norm_stats.py --config-name pi05_custom_finetune
 ```
+
+To run `compute_norm_stats.py` on a neuronic cluster, run 
+
+```bash
+sbatch sbatch_scripts/calc_data_norm.sh
+```
+
+If using your own normalization statistics, in your [`config`](src/openpi/training/config.py), set `assets_dir` and `asset_id` so that together `assets_dir/asset_id` form the directory containing your norm_stats.json file. For example, if your norm_stats.json file is located in `/directory/processed_data/my_experiment/data`, set `assets_dir=/directory/processed_data/my_experiment` and `asset_id=data`
 
 Now we can kick off training with the following command (the `--overwrite` flag is used to overwrite existing checkpoints if you rerun fine-tuning with the same config):
 
 ```bash
-XLA_PYTHON_CLIENT_MEM_FRACTION=0.9 uv run scripts/train.py pi05_libero --exp-name=my_experiment --overwrite
+XLA_PYTHON_CLIENT_MEM_FRACTION=0.9 uv run scripts/train.py pi05_custom_finetune --exp-name=my_experiment --overwrite
+```
+
+If running on neuronic, update and run the sbatch file: 
+
+```bash
+sbatch sbatch_scripts/train_droid.sh
 ```
 
 The command will log training progress to the console and save checkpoints to the `checkpoints` directory. You can also monitor training progress on the Weights & Biases dashboard. For maximally using the GPU memory, set `XLA_PYTHON_CLIENT_MEM_FRACTION=0.9` before running training -- this enables JAX to use up to 90% of the GPU memory (vs. the default of 75%).
@@ -184,19 +189,18 @@ The command will log training progress to the console and save checkpoints to th
 
 ### 3. Spinning up a policy server and running inference
 
-Once training is complete, we can run inference by spinning up a policy server and then querying it from a LIBERO evaluation script. Launching a model server is easy (we use the checkpoint for iteration 20,000 for this example, modify as needed):
+Once training is complete, we can run inference by spinning up a policy server and then querying it from an evaluation script. Transfer the checkpoint files to the computer connected to the Franka robot using `rsync -avh`. Launching a model server is easy (we use the checkpoint for iteration 20,000 for this example, modify as needed):
 
 ```bash
-uv run scripts/serve_policy.py policy:checkpoint --policy.config=pi05_libero --policy.dir=checkpoints/pi05_libero/my_experiment/20000
+uv run scripts/serve_policy.py policy:checkpoint --policy.config=pi05_custom_finetune --policy.dir=checkpoints/pi05_libero/my_experiment/20000
 ```
 
-This will spin up a server that listens on port 8000 and waits for observations to be sent to it. We can then run an evaluation script (or robot runtime) that queries the server.
+This will spin up a server that listens on port 8000 and waits for observations to be sent to it. We can then run an evaluation script (or robot runtime) that queries the server. This can be done by opening a new terminal and running: 
 
-For running the LIBERO eval in particular, we provide (and recommend using) a Dockerized workflow that handles both the policy server and the evaluation script together. See the [LIBERO README](examples/libero/README.md) for more details.
-
-If you want to embed a policy server call in your own robot runtime, we have a minimal example of how to do so in the [remote inference docs](docs/remote_inference.md).
-
-
+```bash
+conda activate robot
+python examples/droid/main.py --remote_host=0.0.0.0 --remote_port=8000 --external_camera=right
+```
 
 ### More Examples
 
