@@ -892,6 +892,42 @@ _CONFIGS = [
         keep_period=10_000,
         num_workers=0,  # Important: RLDS DataLoader requires num_workers=0, handles multi-processing internally
     ),
+
+    #
+    # Fine-tuning custom configs
+    #
+    TrainConfig(
+        # This config is for fine-tuning pi0-FAST-base on a custom (smaller) DROID dataset.
+        # Here, we use LeRobot data format (like for all other fine-tuning examples)
+        name="pi0_droid_finetune",
+        model=pi0_config.Pi0Config(
+            action_dim=32,
+            action_horizon=16,
+            paligemma_variant="gemma_2b_lora"),
+        data=LeRobotDROIDDataConfig( 
+            # Replace with your custom DROID LeRobot dataset repo id.
+            repo_id="your_hf_username/my_droid_dataset",
+            base_config=DataConfig(prompt_from_task=True),
+            assets=AssetsConfig(
+                # Important: reuse the original DROID norm stats during fine-tuning!
+                assets_dir="gs://openpi-assets/checkpoints/pi0_base/assets",
+                asset_id="droid",
+            ),
+        ),
+        weight_loader=weight_loaders.CheckpointWeightLoader("gs://openpi-assets/checkpoints/pi0_base/params"),
+        freeze_filter=pi0_config.Pi0Config(
+            action_dim=8,
+            action_horizon=16,
+            paligemma_variant="gemma_2b_lora"
+        ).get_freeze_filter(), 
+        # Turn off EMA for LoRA finetuning.
+        ema_decay=None,
+        num_train_steps=5_000,  # total number of training steps
+        save_interval=1000, # every 1000 steps will save a checkpoint 
+        keep_period=1000,   # ensures every 1000 steps are saved and kept (not overwritten)
+        batch_size=32,  # adjust to 16 if gpu memory is overloaded
+    ),
+
     TrainConfig(
         # This config is for fine-tuning pi05-DROID on a custom (smaller) DROID dataset.
         # Here, we use LeRobot data format (like for all other fine-tuning examples)
@@ -913,9 +949,13 @@ _CONFIGS = [
             ),
         ),
         weight_loader=weight_loaders.CheckpointWeightLoader("gs://openpi-assets/checkpoints/pi05_droid/params"),
-        num_train_steps=20_000,
-        batch_size=32,
+        ema_decay=None,
+        num_train_steps=8000,
+        save_interval=4000,
+        keep_period=4000,
+        batch_size=16,
     ),
+    
     #
     # ALOHA Sim configs. This config is used to demonstrate how to train on a simple simulated environment.
     #
