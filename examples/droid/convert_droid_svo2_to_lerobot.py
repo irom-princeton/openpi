@@ -9,10 +9,7 @@ Data structure expected:
         <cam_id>.svo2   (MCAP container with HEVC side-by-side stereo video)
 
 Usage:
-  source bash_scripts/setup.bash
-  uv run examples/droid/convert_droid_svo2_to_lerobot.py --data_dir <path to data directory>
-
-The resulting dataset is saved to $HF_LEROBOT_HOME/irom_droid.
+  uv run examples/droid/convert_droid_svo2_to_lerobot.py --data_dir <path to data directory> --output_path <path to output directory>
 """
 
 import shutil
@@ -25,10 +22,6 @@ from mcap.reader import make_reader
 import numpy as np
 from tqdm import tqdm
 import tyro
-
-# UPDATE: resulting data will be stored in HF_LEROBOT_HOME/REPO_NAME
-HF_LEROBOT_HOME = "/n/fs/iromdata/droidpi0_fine_tuning_data/testing"
-REPO_NAME = "irom_droid"  # UPDATE TO YOUR OWN REPO NAME
 
 FPS = 15
 IMAGE_W, IMAGE_H = 320, 180  # DROID RLDS convention
@@ -121,13 +114,14 @@ def load_episode(episode_dir: Path) -> dict:
     }
 
 
-def main(data_dir: str, *, push_to_hub: bool = False):
-    output_path = HF_LEROBOT_HOME / REPO_NAME
+def main(data_dir: str, output_path: str, *, push_to_hub: bool = False):
+    output_path = Path(output_path)
     if output_path.exists():
         shutil.rmtree(output_path)
 
     dataset = LeRobotDataset.create(
-        repo_id=REPO_NAME,
+        repo_id=output_path.name,
+        root=output_path,
         robot_type="panda",
         fps=FPS,
         features={

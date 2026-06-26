@@ -124,27 +124,32 @@ We provide detailed step-by-step examples for running inference of our pre-train
 ## Fine-Tuning Base Models on Your Own Data
 For the original instructions for fine-tuning the $\pi_{0.5}$ model on collected Libero data, read the fine-tuning instructions [here](https://github.com/Physical-Intelligence/openpi/tree/main). 
 
-We will finetune the $\pi_{0}$ model and $\pi_{0.5}$ model on a custom (smaller) DROID dataset collected on Franka Emika Robot Arm. This will be explained in three steps:
+We will finetune the $\pi_{0}$ model and $\pi_{0.5}$ model on a custom (smaller) dataset collected using the DROID Franka setup. This will be explained in three steps:
 1. Convert your data to a LeRobot dataset (which we use for training)
 2. Defining training configs and running training
 3. Spinning up a policy server and running inference
 
 
 ### 2. Convert your data to a LeRobot dataset
-**Set up:**
-Update `HF_LEROBOT_HOME` in [`bash_scripts/setup.bash`](bash_scripts/setup.bash). This is where your processed data will be saved. Run `source bash_scripts/setup.bash` to run the setup file. 
+There are two methods to convert SVO2 data to LeRobot format:
 
-There are now two methods to convert SVO2 data to LeRobot format
-1. Directly convert from svo2 to LeRobot.
-
-   Create a directory for the raw data and use `rsync -azvp` to push the raw data files from the desktop connected to to that directory. The `REPO_NAME` is automatically set to "irom_droid" which you can update to your desired name. Run the [`examples/droid/convert_droid_svo2_to_lerobot.py`](examples/droid/convert_droid_svo2_to_lerobot.py) script with:
+**Method 1.** Directly convert from SVO2 to LeRobot.
+   
+   Create a directory for the raw data and use `rsync -azvp` to push the raw data files into that directory. Run the [`examples/droid/convert_droid_svo2_to_lerobot.py`](examples/droid/convert_droid_svo2_to_lerobot.py) script with:
 
 ```bash
-uv run examples/droid/convert_droid_svo2_to_lerobot.py --data_dir /path/to/your/droid/data
+uv run examples/droid/convert_droid_svo2_to_lerobot.py --data_dir /path/to/your/droid/data --output_path /path/to/your/output/data 
 ```
 
-2. Convert your svo2 files to mp4 format and then to a LeRobot dataset.
-   This requires an extra step, but allows you to directly view your videos on the computer. Using the computer connected to the Franka robot arm, dun the following command to convert your SVO2 files to mp4 format:   
+If converting a lot of files, you can also run this on neuronic by updating the sbatch script [`convert_droid_svo2_to_lerobot.sh`](sbatch_scripts/convert_droid_svo2_to_lerobot.sh) and running it with: 
+
+```bash
+sbatch sbatch_scripts/convert_droid_svo2_to_lerobot.sh
+```
+
+**Method 2.** Convert your svo2 files to mp4 format and then to a LeRobot dataset.
+
+   This requires an extra step, but allows you to directly view your videos on the computer. Using the computer connected to the Franka robot arm, run the following command to convert your SVO2 files to mp4 format:   
 
 ```bash
 
@@ -155,15 +160,15 @@ uv run examples/droid/convert_droid_svo2_to_lerobot.py --data_dir /path/to/your/
 ### 2. Defining training configs and running training
 To fine-tune a base model on your own data, you need to define configs for data processing and training. We provide example configs with detailed comments for finetuning pi05-DROID and pi0-fast, which you can modify for your own dataset in [`TrainConfig`](src/openpi/training/config.py).
 
-When you fine-tune one of our models on a new dataset, you need to decide whether to (A) reuse existing normalization statistics or (B) compute new statistics over your new training data. Which option is better for you depends on the similarity of your robot and task to the robot and task distribution in the pre-training dataset. In most cases, though, you will be using the original DROID norm stats during fine-tuning. 
+When you fine-tune one of our models on a new dataset, you need to decide whether to (A) reuse existing normalization statistics or (B) compute new statistics over your new training data. Which option is better for you depends on the similarity of your robot and task to the robot and task distribution in the pre-training dataset. In most cases, though, you will be using the original DROID norm stats during fine-tuning (and you can skip the step for computing your own norm stats). 
 
 To compute your own normalization statistics for the training data, run the script below with the name of your training config:
 
 ```bash
-uv run scripts/compute_norm_stats.py --config-name pi05_custom_finetune
+uv run scripts/compute_norm_stats.py --config-name pi05_droid_finetune
 ```
 
-To run `compute_norm_stats.py` on a neuronic cluster, run 
+If you have many files, you can run `compute_norm_stats.py` on a neuronic cluster with:  
 
 ```bash
 sbatch sbatch_scripts/calc_data_norm.sh
@@ -174,16 +179,16 @@ If using your own normalization statistics, in your [`config`](src/openpi/traini
 Now we can kick off training with the following command (the `--overwrite` flag is used to overwrite existing checkpoints if you rerun fine-tuning with the same config):
 
 ```bash
-XLA_PYTHON_CLIENT_MEM_FRACTION=0.9 uv run scripts/train.py pi05_custom_finetune --exp-name=my_experiment --overwrite
+XLA_PYTHON_CLIENT_MEM_FRACTION=0.9 uv run scripts/train.py pi05_droid_finetune --exp-name=my_experiment --overwrite
 ```
 
-If running on neuronic, update and run the sbatch file: 
+If running on neuronic (recommended), update and run the sbatch file: 
 
 ```bash
 sbatch sbatch_scripts/train_droid.sh
 ```
 
-To reduce memory usage and increase the speed of the finetuning process, increase `fsdp_devices`in [`TrainConfig`](src/openpi/training/config.py). Make sure to increase the gpu's requested in [`sbatch_scripts/train_droid.sh`](sbatch_scripts/train_droid.sh) accordingly (number of gpus requested should match the number of fsdp_devices). 
+To reduce memory usage and increase the speed of the fine-tuning process, increase `fsdp_devices` in [`TrainConfig`](src/openpi/training/config.py). Make sure to increase the gpu's requested in [`sbatch_scripts/train_droid.sh`](sbatch_scripts/train_droid.sh) accordingly (number of gpus requested should match the number of fsdp_devices, usually 2 is a good number). 
 
 
 The command will log training progress to the console and save checkpoints to the `checkpoints` directory. You can also monitor training progress on the Weights & Biases dashboard. For maximally using the GPU memory, set `XLA_PYTHON_CLIENT_MEM_FRACTION=0.9` before running training -- this enables JAX to use up to 90% of the GPU memory (vs. the default of 75%).
@@ -195,7 +200,7 @@ The command will log training progress to the console and save checkpoints to th
 Once training is complete, we can run inference by spinning up a policy server and then querying it from an evaluation script. Transfer the checkpoint files to the computer connected to the Franka robot using `rsync -avh`. Launching a model server is easy (we use the checkpoint for iteration 20,000 for this example, modify as needed):
 
 ```bash
-uv run scripts/serve_policy.py policy:checkpoint --policy.config=pi05_custom_finetune --policy.dir=checkpoints/pi05_libero/my_experiment/20000
+uv run scripts/serve_policy.py policy:checkpoint --policy.config=pi05_droid_finetune --policy.dir=checkpoints/pi05_libero/my_experiment/20000
 ```
 
 This will spin up a server that listens on port 8000 and waits for observations to be sent to it. We can then run an evaluation script (or robot runtime) that queries the server. This can be done by opening a new terminal and running: 

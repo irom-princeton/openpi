@@ -8,10 +8,11 @@
 #SBATCH --time=8:00:00
 #SBATCH --output=slurm_outputs/%x/out_log_%x_%j.out
 #SBATCH --mail-type=FAIL
-#SBATCH --mail-user=sh1200@princeton.edu
+#SBATCH --mail-user=example@princeton.edu
 #SBATCH --exclude=neu301,neu309,neu312
 
-cd /n/fs/playwtest/projects/openpi_cath
+# if needed, include a line to cd into the appropriate directory, ex: cd home/path/openpi
 source bash_scripts/setup.bash
 
-XLA_PYTHON_CLIENT_MEM_FRACTION=0.9 uv run scripts/train.py pi05_sarah_droid_finetune --exp-name=pi05_hang_mug_simple_normstats --overwrite
+# update the config name (if changed) and the experiment name 
+XLA_PYTHON_CLIENT_MEM_FRACTION=0.9 uv run scripts/train.py pi05_droid_finetune --exp-name=pi05_fineune_my_experiment --overwrite
