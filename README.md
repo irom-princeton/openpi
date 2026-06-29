@@ -131,11 +131,9 @@ We will finetune the $\pi_{0}$ model and $\pi_{0.5}$ model on a custom (smaller)
 
 
 ### 2. Convert your data to a LeRobot dataset
-There are two methods to convert SVO2 data to LeRobot format:
+First, ensure the raw data files are saved to your computer. If they are currently located on another computer, use `rsync -azvp` to push the raw data files into a directory on your computer. 
 
-**Method 1.** Directly convert from SVO2 to LeRobot.
-   
-   Create a directory for the raw data and use `rsync -azvp` to push the raw data files into that directory. Run the [`examples/droid/convert_droid_svo2_to_lerobot.py`](examples/droid/convert_droid_svo2_to_lerobot.py) script with:
+Directly convert the SVO2 files to a LeRobot dataset using the [`examples/droid/convert_droid_svo2_to_lerobot.py`](examples/droid/convert_droid_svo2_to_lerobot.py) script with:
 
 ```bash
 uv run examples/droid/convert_droid_svo2_to_lerobot.py --data_dir /path/to/your/droid/data --output_path /path/to/your/output/data 
@@ -147,15 +145,11 @@ If converting a lot of files, you can also run this on neuronic by updating the 
 sbatch sbatch_scripts/convert_droid_svo2_to_lerobot.sh
 ```
 
-**Method 2.** Convert your svo2 files to mp4 format and then to a LeRobot dataset.
-
-   This requires an extra step, but allows you to directly view your videos on the computer. Using the computer connected to the Franka robot arm, run the following command to convert your SVO2 files to mp4 format:   
+**Note:** To directly view the video files on your computer, you may convert your SVO2 files to MP4 format by running: 
 
 ```bash
-
+uv run examples/droid/convert_svo2_to_mp4.py --input_dir /path/to/your/droid/data
 ```
-   Use `rsync -azvp` to push the mp4 videos to your neuronic folder for raw data and run [`examples/droid/convert_droid_data_to_lerobot.py`](examples/droid/convert_droid_data_to_lerobot.py), 
-
 
 ### 2. Defining training configs and running training
 To fine-tune a base model on your own data, you need to define configs for data processing and training. We provide example configs with detailed comments for finetuning pi05-DROID and pi0-fast, which you can modify for your own dataset in [`TrainConfig`](src/openpi/training/config.py).
